@@ -17,6 +17,32 @@ from orchestrator.policy_bandit import LinUCBBandit
 from orchestrator.logging_utils import append_jsonl
 from orchestrator.confidence import ConfidenceInput, compute_confidence
 from agents.risk import RiskGuard
+from agents.liquidity import LiquidityGuard
+from agents.events import EventGuard
+from agents.fx import FxGuard
+
+
+class RiskInputs(BaseModel):
+    proposed_risk_pct: float
+    portfolio_risk_pct: float
+    sector_risk_pct: float
+    corr_cluster_risk_pct: float
+    underlying_risk_pct: float
+
+
+class LiquidityInputs(BaseModel):
+    leg_spread: float
+    open_interest: int
+    chain_volume: int
+
+
+class EventInputs(BaseModel):
+    macro_buffer_days: float
+    earnings_buffer_days: float
+
+
+class FxInputs(BaseModel):
+    slippage_pips: float
 
 
 class DecisionRequest(BaseModel):
@@ -29,6 +55,11 @@ class DecisionRequest(BaseModel):
     theta_captured: float
     event_buffer: float
     gamma_risk: float
+    # Vetos (toutes requises; sinon 422 par validation Pydantic)
+    risk: RiskInputs
+    liquidity: LiquidityInputs
+    events: EventInputs
+    fx: FxInputs
 
 class RiskEvalRequest(BaseModel):
     proposed_risk_pct: float
@@ -58,6 +89,9 @@ def create_app(config_path: str) -> FastAPI:
     api = SeekerAPI(config_path)
     app = FastAPI(title="Seek and Trade — Seeker API")
     risk_guard = RiskGuard(api.cfg)
+    liquidity_guard = LiquidityGuard(api.cfg)
+    event_guard = EventGuard(api.cfg)
+    fx_guard = FxGuard(api.cfg)
     # UI static (dark) served at /ui
     app.mount("/ui", StaticFiles(directory="/app/ui", html=True), name="ui")
 
@@ -79,6 +113,39 @@ def create_app(config_path: str) -> FastAPI:
             x = np.array(req.features, dtype=float).reshape(-1, 1)
             if x.shape[0] != api.cfg.bandit.feature_dim:
                 raise HTTPException(status_code=400, detail=f"features must have length {api.cfg.bandit.feature_dim}")
+            # Vetos stricts: aucune valeur par défaut; les entrées sont requises au schéma
+            risk_status = risk_guard.evaluate_proposed_trade(
+                proposed={
+                    "proposed_risk_pct": req.risk.proposed_risk_pct,
+                    "portfolio_risk_pct": req.risk.portfolio_risk_pct,
+                    "sector_risk_pct": req.risk.sector_risk_pct,
+                    "corr_cluster_risk_pct": req.risk.corr_cluster_risk_pct,
+                    "underlying_risk_pct": req.risk.underlying_risk_pct,
+                },
+                portfolio_state=None,
+            )
+            if not risk_status.allowed:
+                raise HTTPException(status_code=400, detail=f"risk_veto:{risk_status.reason}")
+
+            lq_status = liquidity_guard.evaluate(
+                leg_spread=req.liquidity.leg_spread,
+                open_interest=req.liquidity.open_interest,
+                chain_volume=req.liquidity.chain_volume,
+            )
+            if not lq_status.allowed:
+                raise HTTPException(status_code=400, detail=f"liquidity_veto:{lq_status.reason}")
+
+            ev_status = event_guard.evaluate(
+                macro_buffer_days=req.events.macro_buffer_days,
+                earnings_buffer_days=req.events.earnings_buffer_days,
+            )
+            if not ev_status.allowed:
+                raise HTTPException(status_code=400, detail=f"event_veto:{ev_status.reason}")
+
+            fx_status = fx_guard.evaluate(slippage_pips=req.fx.slippage_pips)
+            if not fx_status.allowed:
+                raise HTTPException(status_code=400, detail=f"fx_veto:{fx_status.reason}")
+
             chosen = api.choose(x)
             # Confiance (champs requis)
             ci = ConfidenceInput(

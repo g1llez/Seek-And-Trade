@@ -24,6 +24,25 @@ def test_health_and_decision():
         "theta_captured": 0.0,
         "event_buffer": 1.0,
         "gamma_risk": 0.2,
+        "risk": {
+            "proposed_risk_pct": 0.05,
+            "portfolio_risk_pct": 0.10,
+            "sector_risk_pct": 0.10,
+            "corr_cluster_risk_pct": 0.10,
+            "underlying_risk_pct": 0.10,
+        },
+        "liquidity": {
+            "leg_spread": 0.05,
+            "open_interest": 1000,
+            "chain_volume": 2000,
+        },
+        "events": {
+            "macro_buffer_days": 2.0,
+            "earnings_buffer_days": 5.0,
+        },
+        "fx": {
+            "slippage_pips": 0.5
+        }
     }
     r2 = client.post("/decision", json=payload)
     assert r2.status_code == 200
