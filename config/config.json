@@ -1,0 +1,28 @@
+{
+  "risk": {
+    "max_per_trade_pct": 0.10,
+    "max_portfolio_pct": 0.25,
+    "max_sector_pct": 0.40,
+    "max_corr_cluster_pct": 0.50,
+    "max_per_underlying_pct": 0.15
+  },
+  "liquidity": {
+    "max_leg_spread": 0.05,
+    "min_open_interest": 500,
+    "min_chain_volume": 1000
+  },
+  "events": {
+    "macro_buffer_days": 1,
+    "earnings_buffer_days": 3
+  },
+  "fx": {
+    "max_slippage_pips": 1
+  },
+  "strategies": {
+    "enabled": ["credit_spread", "iron_condor", "diagonal", "iron_fly", "broken_wing_butterfly"]
+  },
+  "bandit": {
+    "alpha": 0.5,
+    "feature_dim": 8
+  }
+}

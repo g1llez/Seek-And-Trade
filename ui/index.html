@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Seek and Trade — Seeker UI</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #0b0f14; color: #e5e9f0; }
+    header { padding: 16px 24px; border-bottom: 1px solid #1f2933; background: #0e141b; }
+    h1 { font-size: 18px; margin: 0; letter-spacing: 0.4px; }
+    main { padding: 24px; display: grid; gap: 16px; max-width: 980px; margin: 0 auto; }
+    .card { background: #111821; border: 1px solid #1f2933; border-radius: 10px; padding: 16px; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    label { font-size: 12px; color: #a7b2c3; }
+    input[type="number"] { background: #0e141b; color: #e5e9f0; border: 1px solid #1f2933; border-radius: 6px; padding: 8px; width: 100px; }
+    button { background: #2563eb; color: #fff; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12px; }
+    .badge { background: #0e141b; border: 1px solid #1f2933; padding: 6px 8px; border-radius: 999px; }
+    .ok { color: #22c55e; border-color: #065f46; }
+    .warn { color: #f59e0b; border-color: #7c3d12; }
+  </style>
+  <script>
+    async function fetchHealth() {
+      const r = await fetch('/health');
+      if (!r.ok) throw new Error('health failed');
+      return r.json();
+    }
+    async function postDecision(payload) {
+      const r = await fetch('/decision', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)});
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+    async function fetchHistory() {
+      const r = await fetch('/history?limit=20');
+      if (!r.ok) throw new Error('history failed');
+      return r.json();
+    }
+    function q(id){ return document.getElementById(id); }
+    async function init(){
+      const health = await fetchHealth();
+      q('actions').textContent = health.actions.join(', ');
+      renderHistory(await fetchHistory());
+    }
+    async function decide(){
+      q('btn').disabled = true;
+      q('out').textContent = '...';
+      try {
+        const features = q('features').value.split(',').map(x=>parseFloat(x.trim()));
+        const payload = {
+          features,
+          dte: parseInt(q('dte').value, 10),
+          short_delta: parseFloat(q('delta').value),
+          distance_atr: parseFloat(q('dist').value),
+          ivr_norm: parseFloat(q('ivr').value),
+          theta_captured: parseFloat(q('theta').value),
+          event_buffer: parseFloat(q('evt').value),
+          gamma_risk: parseFloat(q('gamma').value)
+        };
+        const res = await postDecision(payload);
+        q('out').textContent = JSON.stringify(res, null, 2);
+        const c = res.confidence;
+        q('conf').textContent = Math.round(c.score);
+        const comps = c.components;
+        q('badges').innerHTML = '';
+        const items = [
+          ['time', comps.time, 'ok'],
+          ['delta', comps.delta, comps.delta>=0.5?'ok':'warn'],
+          ['distance_atr', comps.distance_atr, comps.distance_atr>=0.5?'ok':'warn'],
+          ['ivr', comps.ivr, 'ok'],
+          ['theta', comps.theta, comps.theta>=0.2?'ok':'warn'],
+          ['event_buffer', comps.event_buffer, comps.event_buffer>=0.7?'ok':'warn'],
+          ['gamma', comps.gamma, comps.gamma<=0.3?'ok':'warn']
+        ];
+        for (const [k,v,cls] of items){
+          const span = document.createElement('span');
+          span.className = `badge ${cls}`; span.textContent = `${k}: ${v.toFixed(2)}`;
+          q('badges').appendChild(span);
+        }
+        renderHistory(await fetchHistory());
+      } catch(e){
+        q('out').textContent = String(e);
+      } finally {
+        q('btn').disabled = false;
+      }
+    }
+    function renderHistory(data){
+      const el = q('history');
+      el.innerHTML = '';
+      for (const item of (data.items||[])){
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `<div class="row"><strong>${item.chosen}</strong><span class="badge">conf: ${item.confidence?Math.round(item.confidence.score):'—'}</span></div>
+                         <div class="mono">features: ${JSON.stringify(item.features)}</div>`;
+        el.appendChild(div);
+      }
+    }
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+  </head>
+<body>
+  <header>
+    <h1>Seek and Trade — Seeker UI</h1>
+  </header>
+  <main>
+    <div class="card">
+      <div class="row"><label>Actions disponibles:</label> <span id="actions" class="mono"></span></div>
+    </div>
+    <div class="card grid">
+      <div>
+        <div class="row"><label>Features (8):</label> <input id="features" type="text" value="0,0,0,0,0,0,0,0" class="mono" style="width: 260px"></div>
+        <div class="row"><label>DTE:</label> <input id="dte" type="number" value="45"></div>
+        <div class="row"><label>Short Δ:</label> <input id="delta" type="number" value="0.12" step="0.01"></div>
+        <div class="row"><label>Distance/ATR:</label> <input id="dist" type="number" value="1.5" step="0.1"></div>
+        <div class="row"><label>IVR (0..1):</label> <input id="ivr" type="number" value="0.6" step="0.05"></div>
+        <div class="row"><label>Theta captured (0..1):</label> <input id="theta" type="number" value="0.1" step="0.05"></div>
+        <div class="row"><label>Event buffer (0..1):</label> <input id="evt" type="number" value="1.0" step="0.1"></div>
+        <div class="row"><label>Gamma risk (0..1):</label> <input id="gamma" type="number" value="0.2" step="0.05"></div>
+        <div class="row"><button id="btn" onclick="decide()">Demander une décision</button></div>
+      </div>
+      <div>
+        <div class="row"><label>Confiance:</label> <span id="conf" class="badge ok">—</span></div>
+        <div class="row" id="badges" style="gap:8px; margin-top:8px;"></div>
+        <pre class="mono" id="out" style="margin-top:12px; white-space: pre-wrap; word-break: break-word;">—</pre>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Historique des décisions</h3>
+      <div id="history" class="grid"></div>
+    </div>
+  </main>
+</body>
+</html>
+
+
