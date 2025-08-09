@@ -14,6 +14,7 @@ COPY orchestrator /app/orchestrator
 COPY agents /app/agents
 COPY config /app/config
 COPY ui /app/ui
+COPY tests /app/tests
 COPY PROJECT.md README.md /app/
 
 # Install runtime dependencies
