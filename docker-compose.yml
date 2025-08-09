@@ -1,9 +1,24 @@
 services:
+  ib-gateway:
+    image: hanzel/docker-ib-gateway:latest
+    environment:
+      - TWSUSERID=${IBKR_USER}
+      - TWSPASSWORD=${IBKR_PASSWORD}
+      - TRADING_MODE=${IBKR_TRADING_MODE}
+    ports:
+      - "4002:4002"
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "nc -z localhost 4002"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
   seeker:
     build: .
     image: ai-trading/seeker:dev
     environment:
       - PYTHONUNBUFFERED=1
+      - CONFIG_PATH=/app/config/config.json
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
@@ -14,3 +29,5 @@ services:
       - ./data:/app/data
     ports:
       - "8001:8000"
+    depends_on:
+      - ib-gateway
