@@ -41,3 +41,11 @@ class AppConfig:
     fx: FxConfig
     strategies: StrategiesConfig
     bandit: BanditConfig
+    ib: 'IBConfig'
+
+@dataclass
+class IBConfig:
+    host: str
+    port: int
+    client_id: int
+    paper: bool

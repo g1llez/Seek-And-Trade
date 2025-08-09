@@ -20,6 +20,7 @@ from agents.risk import RiskGuard
 from agents.liquidity import LiquidityGuard
 from agents.events import EventGuard
 from agents.fx import FxGuard
+from orchestrator.ib_executor import IbExecutor
 
 
 class RiskInputs(BaseModel):
@@ -92,6 +93,7 @@ def create_app(config_path: str) -> FastAPI:
     liquidity_guard = LiquidityGuard(api.cfg)
     event_guard = EventGuard(api.cfg)
     fx_guard = FxGuard(api.cfg)
+    ib_executor = IbExecutor(api.cfg.ib)
     # UI static (dark) served at /ui
     app.mount("/ui", StaticFiles(directory="/app/ui", html=True), name="ui")
 
@@ -106,6 +108,10 @@ def create_app(config_path: str) -> FastAPI:
     @app.get("/health")
     def health() -> dict:
         return {"status": "ok", "actions": api.actions, "feature_dim": api.cfg.bandit.feature_dim}
+    @app.get("/ib/health")
+    def ib_health() -> dict:
+        h = ib_executor.check_health()
+        return {"ok": h.ok, "reason": h.reason}
 
     @app.post("/decision")
     def decision(req: DecisionRequest) -> dict:

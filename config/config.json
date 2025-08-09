@@ -24,5 +24,11 @@
   "bandit": {
     "alpha": 0.5,
     "feature_dim": 8
+  },
+  "ib": {
+    "host": "ib-gateway",
+    "port": 4002,
+    "client_id": 1,
+    "paper": true
   }
 }

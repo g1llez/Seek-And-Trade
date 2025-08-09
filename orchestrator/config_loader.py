@@ -12,6 +12,7 @@ from orchestrator.config_types import (
     FxConfig,
     StrategiesConfig,
     BanditConfig,
+    IBConfig,
 )
 
 class MissingConfigError(Exception):
@@ -53,6 +54,11 @@ def load_config(path: Union[str, Path]) -> AppConfig:
     if not enabled or any(s not in ALLOWED_STRATEGIES for s in enabled):
         raise MissingConfigError("Invalid strategies.enabled")
 
+    # IB config required
+    ib_cfg = data.get("ib")
+    if not ib_cfg or not all(k in ib_cfg for k in ("host", "port", "client_id", "paper")):
+        raise MissingConfigError("Missing required config: ib.{host,port,client_id,paper}")
+
     return AppConfig(
         risk=RiskConfig(**data["risk"]),
         liquidity=LiquidityConfig(**data["liquidity"]),
@@ -60,4 +66,5 @@ def load_config(path: Union[str, Path]) -> AppConfig:
         fx=FxConfig(**data["fx"]),
         strategies=StrategiesConfig(enabled=enabled),
         bandit=BanditConfig(**data["bandit"]),
+        ib=IBConfig(**ib_cfg),
     )
