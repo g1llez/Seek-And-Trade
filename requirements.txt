@@ -3,3 +3,4 @@ fastapi==0.112.2
 uvicorn[standard]==0.30.6
 # ib-insync and others will be added when wiring IBKR
 pytest==8.3.2
+httpx==0.27.2
